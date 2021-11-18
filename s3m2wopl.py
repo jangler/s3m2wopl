@@ -157,16 +157,16 @@ def main():
     # file is replaced, so we monitor the directory instead
     if args.monitor:
         import time
-        from os.path import dirname
+        from os.path import abspath, dirname
         try:
             from watchdog.observers import Observer
             from watchdog.events import FileSystemEventHandler
         except ImportError as e:
             fatal(e)
-        path = dirname(args.src)
+        path = dirname(abspath(args.src))
         handler = FileSystemEventHandler()
         def handle_fs_event(event):
-            if event.event_type == 'modified' and event.src_path == args.src:
+            if event.event_type == 'modified' and abspath(event.src_path) == abspath(args.src):
                 convert(args)
         handler.on_any_event = handle_fs_event
         observer = Observer()
