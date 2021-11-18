@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import re, struct, sys
+import argparse, re, struct, sys
 
 # == code derived from https://github.com/jangler/s3mml ==
 
@@ -121,28 +121,63 @@ def write_opli(inst, f, perc_key=0):
         f.write(op.raw)
     f.write(struct.pack('10x')) # ops 3 and 4
 
-def main():
-    # check usage/args
-    if len(sys.argv) not in (2, 3):
-        print('usage: %s src.s3m [dst.wopl]' % sys.argv[0], file=sys.stderr)
-        exit(1)
+def fatal(e):
+    print(e, file=sys.stderr)
+    exit(1)
 
+def convert(args):
     # read .s3m
     try:
-        with open(sys.argv[1], 'rb') as f:
+        with open(args.src, 'rb') as f:
             s3m = read_s3m(f)
     except OSError as e:
-        print(e, file=sys.stderr)
-        exit(1)
+        fatal(e)
 
     # write .wopl
     try:
-        path = sys.argv[2] if len(sys.argv) == 3 else sys.argv[1].replace('.s3m', '.wopl')
+        path = args.dst if args.dst else sys.argv[1].replace('.s3m', '.wopl')
         with open(path, 'wb') as f:
             write_wopl(s3m.instruments, f)
     except OSError as e:
-        print(e, file=sys.stderr)
-        exit(1)
+        fatal(e)
+
+def main():
+    # handle CLI args
+    parser = argparse.ArgumentParser(description='Convert a S3M to a WOPL instrument set.')
+    parser.add_argument('src', type=str, help='source .s3m file')
+    parser.add_argument('dst', type=str, nargs='?', help='destination .wopl file')
+    parser.add_argument('-m', '--monitor', action='store_true',
+            help='monitor filesystem for changes (requires watchdog)')
+    args = parser.parse_args()
+
+    # run once
+    convert(args)
+
+    # then monitor if necessary. monitoring the file itself can break if the
+    # file is replaced, so we monitor the directory instead
+    if args.monitor:
+        import time
+        from os.path import dirname
+        try:
+            from watchdog.observers import Observer
+            from watchdog.events import FileSystemEventHandler
+        except ImportError as e:
+            fatal(e)
+        path = dirname(args.src)
+        handler = FileSystemEventHandler()
+        def handle_fs_event(event):
+            if event.event_type == 'modified' and event.src_path == args.src:
+                convert(args)
+        handler.on_any_event = handle_fs_event
+        observer = Observer()
+        observer.schedule(handler, path)
+        observer.start()
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            observer.stop()
+        observer.join()
 
 if __name__ == '__main__':
     main()

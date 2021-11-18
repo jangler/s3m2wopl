@@ -8,7 +8,17 @@ S3M files containing **any** sample instruments are not currently supported.
 ## Usage
 
 ```
-$ python s3m2wopl.py src.s3m [dst.wopl]
+usage: s3m2wopl.py [-h] [-m] src [dst]
+
+Convert a S3M to a WOPL instrument set.
+
+positional arguments:
+  src            source .s3m file
+  dst            destination .wopl file
+
+optional arguments:
+  -h, --help     show this help message and exit
+  -m, --monitor  monitor filesystem for changes (requires watchdog)
 ```
 
 ## Instrument mapping
